@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"runtime/debug"
 )
@@ -10,7 +11,9 @@ func main() {
 	http.HandleFunc("/debug/info", handleServiceInfo)
 
 	fmt.Println("service run")
-	http.ListenAndServe(":8090", nil)
+	if err := http.ListenAndServe(":8090", nil); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func handleServiceInfo(w http.ResponseWriter, _ *http.Request) {

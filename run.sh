@@ -1,3 +1,3 @@
 #!/bin/sh
 
-go run -buildvcs .
+go run -buildvcs ./cmd/api-server
