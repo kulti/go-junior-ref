@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -9,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sort"
 	"strings"
+	"syscall"
 )
 
 var (
@@ -34,17 +37,20 @@ func run() error {
 	cmdName := os.Args[1]
 	os.Args = os.Args[1:]
 
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer cancel()
+
 	switch cmdName {
 	case "versions":
-		return runVersions()
+		return runVersions(ctx)
 	case "is-deployed":
-		return runIsDeployed()
+		return runIsDeployed(ctx)
 	default:
 		return fmt.Errorf("%w: %s", errUnknownCommandName, cmdName)
 	}
 }
 
-func runVersions() error {
+func runVersions(ctx context.Context) error {
 	serviceNames := flag.String("s", "", "service name(s)")
 	flag.Parse()
 
@@ -55,7 +61,7 @@ func runVersions() error {
 
 	serviceStates := make([]serviceState, len(services))
 	for i, s := range services {
-		serviceStates[i] = fetchServiceState(s)
+		serviceStates[i] = fetchServiceState(ctx, s)
 	}
 
 	for _, s := range serviceStates {
@@ -73,7 +79,7 @@ func runVersions() error {
 	return nil
 }
 
-func runIsDeployed() error {
+func runIsDeployed(ctx context.Context) error {
 	serviceNames := flag.String("s", "", "service name(s)")
 	commit := flag.String("c", "", "commit hash")
 	flag.Parse()
@@ -81,7 +87,7 @@ func runIsDeployed() error {
 	if *commit == "" {
 		return fmt.Errorf("%w: commit hash", errMissedRequiredArg)
 	}
-	commitMsg, err := commitMessage(*commit)
+	commitMsg, err := commitMessage(ctx, *commit)
 	if err != nil {
 		return fmt.Errorf("get commit message: %w", err)
 	}
@@ -98,10 +104,10 @@ func runIsDeployed() error {
 	states := make([]state, len(services))
 
 	for i, service := range services {
-		state := state{serviceState: fetchServiceState(service)}
+		state := state{serviceState: fetchServiceState(ctx, service)}
 		serviceCommit := getCommitFromMeta(state.meta)
 		if serviceCommit != "" {
-			deployed, err := isAncestor(*commit, serviceCommit)
+			deployed, err := isAncestor(ctx, *commit, serviceCommit)
 			if err != nil {
 				state.err = "check is deployed: " + err.Error()
 			} else {
@@ -150,7 +156,7 @@ type serviceState struct {
 	meta    string
 }
 
-func fetchServiceState(serviceName string) serviceState {
+func fetchServiceState(ctx context.Context, serviceName string) serviceState {
 	serviceState := serviceState{name: serviceName}
 	port, ok := servicePorts[serviceName]
 	if !ok {
@@ -159,7 +165,13 @@ func fetchServiceState(serviceName string) serviceState {
 	}
 
 	url := fmt.Sprintf("http://127.0.0.1:%d/debug/info", port)
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		serviceState.err = fmt.Sprintf("building request: %v", err)
+		return serviceState
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		serviceState.err = fmt.Sprintf("get service info: %v", err)
 		return serviceState
@@ -190,10 +202,10 @@ func getCommitFromMeta(meta string) string {
 	return commit
 }
 
-func isAncestor(a, b string) (bool, error) {
+func isAncestor(ctx context.Context, a, b string) (bool, error) {
 	args := []string{"merge-base", "--is-ancestor", a, b}
 
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	errBuf := &bytes.Buffer{}
 	cmd.Stderr = errBuf
 
@@ -209,10 +221,10 @@ func isAncestor(a, b string) (bool, error) {
 	return true, nil
 }
 
-func commitMessage(commit string) (string, error) {
+func commitMessage(ctx context.Context, commit string) (string, error) {
 	args := []string{"log", "--format=%B", "-n", "1", commit}
 
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	outBuf := &bytes.Buffer{}
 	errBuf := &bytes.Buffer{}
 	cmd.Stdout = outBuf
