@@ -1,0 +1,7 @@
+services:
+  api_server:
+    image: ${IMAGE_TASK_LIST}
+    restart: on-failure
+    command: /app/api-server
+    ports:
+      - "8090:8090"
