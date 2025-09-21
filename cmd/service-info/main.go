@@ -1,17 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"flag"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
-	"os/exec"
 	"os/signal"
-	"sort"
 	"strings"
 	"syscall"
 )
@@ -105,7 +100,7 @@ func runIsDeployed(ctx context.Context) error {
 
 	for i, service := range services {
 		state := state{serviceState: fetchServiceState(ctx, service)}
-		serviceCommit := getCommitFromMeta(state.meta)
+		serviceCommit := state.Commit()
 		if serviceCommit != "" {
 			deployed, err := isAncestor(ctx, *commit, serviceCommit)
 			if err != nil {
@@ -134,105 +129,4 @@ func runIsDeployed(ctx context.Context) error {
 	}
 
 	return nil
-}
-
-var servicePorts = map[string]int{
-	"api-server": 8090,
-}
-
-func allServices() []string {
-	services := make([]string, 0, len(servicePorts))
-	for name := range servicePorts {
-		services = append(services, name)
-	}
-	sort.Strings(services)
-	return services
-}
-
-type serviceState struct {
-	name    string
-	unknown bool
-	err     string
-	meta    string
-}
-
-func fetchServiceState(ctx context.Context, serviceName string) serviceState {
-	serviceState := serviceState{name: serviceName}
-	port, ok := servicePorts[serviceName]
-	if !ok {
-		serviceState.unknown = true
-		return serviceState
-	}
-
-	url := fmt.Sprintf("http://127.0.0.1:%d/debug/info", port)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		serviceState.err = fmt.Sprintf("building request: %v", err)
-		return serviceState
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		serviceState.err = fmt.Sprintf("get service info: %v", err)
-		return serviceState
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		serviceState.err = fmt.Sprintf("returned non-ok status code: %d", resp.StatusCode)
-		return serviceState
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		serviceState.err = fmt.Sprintf("read response body: %v", err)
-		return serviceState
-	}
-	serviceState.meta = string(body)
-	return serviceState
-}
-
-func getCommitFromMeta(meta string) string {
-	n := strings.Index(meta, "Build Version: ")
-	if n == -1 {
-		return ""
-	}
-
-	commit, _, _ := strings.Cut(meta[n+len("Build Version: "):], " ")
-	return commit
-}
-
-func isAncestor(ctx context.Context, a, b string) (bool, error) {
-	args := []string{"merge-base", "--is-ancestor", a, b}
-
-	cmd := exec.CommandContext(ctx, "git", args...)
-	errBuf := &bytes.Buffer{}
-	cmd.Stderr = errBuf
-
-	if err := cmd.Run(); err != nil {
-		var ee *exec.ExitError
-		if errors.As(err, &ee) && ee.ExitCode() == 1 {
-			return false, nil
-		}
-
-		return false, fmt.Errorf("%w (%s)", err, errBuf.Bytes())
-	}
-
-	return true, nil
-}
-
-func commitMessage(ctx context.Context, commit string) (string, error) {
-	args := []string{"log", "--format=%B", "-n", "1", commit}
-
-	cmd := exec.CommandContext(ctx, "git", args...)
-	outBuf := &bytes.Buffer{}
-	errBuf := &bytes.Buffer{}
-	cmd.Stdout = outBuf
-	cmd.Stderr = errBuf
-
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%w (%s)", err, errBuf.Bytes())
-	}
-
-	return strings.TrimSpace(outBuf.String()), nil
 }
