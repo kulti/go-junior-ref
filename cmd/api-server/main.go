@@ -24,6 +24,7 @@ func main() {
 
 	http.HandleFunc("GET /debug/info", handleServiceInfo)
 	http.HandleFunc("POST /v1/lists", newHandeCreateList(conn))
+	http.HandleFunc("GET /v1/lists/{list_id}", newHandeGetList(conn))
 
 	fmt.Println("service run")
 	if err := http.ListenAndServe(":8090", nil); err != nil {
@@ -63,6 +64,34 @@ func newHandeCreateList(conn *pgx.Conn) http.HandlerFunc {
 
 		resp.List.ID = listID
 		resp.List.Name = req.Name
+
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			// how to handle this error?
+		}
+	}
+}
+
+func newHandeGetList(conn *pgx.Conn) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		listID := r.PathValue("list_id")
+
+		var listName string
+		row := conn.QueryRow(r.Context(), `SELECT name FROM lists WHERE id = $1`, listID)
+		if err := row.Scan(&listName); err != nil {
+			slog.Error("failed get list from db", slog.String("err", err.Error()))
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+
+		var resp struct {
+			List struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"list"`
+		}
+
+		resp.List.ID = listID
+		resp.List.Name = listName
 
 		if err := json.NewEncoder(w).Encode(resp); err != nil {
 			// how to handle this error?
