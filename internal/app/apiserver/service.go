@@ -3,6 +3,7 @@ package apiserver
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/httpserver"
@@ -12,15 +13,16 @@ import (
 )
 
 func New() (*service.Service, error) {
-	s := &service.Service{}
+	s := service.New()
 
 	pgconn, err := pgconn.New(pgconn.Params{
 		ConnectionString: os.Getenv("API_SERVER_DB_URL"),
+		ChecknInterval:   5 * time.Second,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("new db conn: %w", err)
 	}
-	s.Components = append(s.Components, pgconn)
+	s.AddComponent("pgconn", pgconn)
 
 	store := store.New(store.Params{PgConn: pgconn})
 	app := app.New(app.Params{Store: store})
@@ -28,8 +30,9 @@ func New() (*service.Service, error) {
 	server := httpserver.New(httpserver.Params{
 		App:           app,
 		ListenAddress: ":8090",
+		ReadyHandler:  s.HandleReady,
 	})
-	s.Components = append(s.Components, server)
+	s.AddComponent("httpserver", server)
 
 	return s, nil
 }

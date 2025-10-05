@@ -14,6 +14,7 @@ RUN go mod download
 COPY . .
 
 RUN go build -buildvcs -o /app/api-server ./cmd/api-server
+RUN go build -o /app/healthcheck ./cmd/healthcheck
 
 FROM alpine:3.22
 
@@ -25,3 +26,6 @@ RUN chown app /app
 USER app
 
 COPY --from=builder /app/api-server /app/
+COPY --from=builder /app/healthcheck /app/
+
+HEALTHCHECK --interval=10s --timeout=10s --retries=3 CMD /app/healthcheck

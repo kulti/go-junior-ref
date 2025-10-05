@@ -20,10 +20,10 @@ function main() {
         docker compose -p "${PROJECT_NAME}" "${cmd}" "$@"
         ;;
     up)
-        docker compose -p "${PROJECT_NAME}" up -d "$@"
+        docker compose -p "${PROJECT_NAME}" up -d --remove-orphans --wait "$@"
         ;;
     recreate)
-        docker compose -p "${PROJECT_NAME}" up --remove-orphans -d --no-deps "$@"
+        docker compose -p "${PROJECT_NAME}" up --remove-orphans -d --no-deps --wait "$@"
         ;;
     clean)
         docker compose -p "${PROJECT_NAME}" down -v --remove-orphans

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"runtime/debug"
+	"sync/atomic"
 
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 )
@@ -18,18 +19,21 @@ type app interface {
 }
 
 type Server struct {
-	mux  *http.ServeMux
-	app  app
-	addr string
+	mux   *http.ServeMux
+	app   app
+	addr  string
+	ready atomic.Bool
 }
 
 type Params struct {
 	ListenAddress string
 	App           app
+	ReadyHandler  http.HandlerFunc
 }
 
 func New(p Params) *Server {
 	s := &Server{mux: http.NewServeMux(), app: p.App, addr: p.ListenAddress}
+	s.mux.Handle("GET /_/ready", p.ReadyHandler)
 	s.mux.HandleFunc("GET /debug/info", handleServiceInfo)
 	s.mux.HandleFunc("POST /v1/lists", s.handeCreateList)
 	s.mux.HandleFunc("GET /v1/lists/{list_id}", s.handeGetList)
@@ -37,6 +41,18 @@ func New(p Params) *Server {
 }
 
 func (s *Server) Run(ctx context.Context) {
+	var ln net.Listener
+	for {
+		var err error
+		lc := net.ListenConfig{}
+		ln, err = lc.Listen(ctx, "tcp", s.addr)
+		if err != nil {
+			slog.Warn("failed to listen", slog.String("addr", s.addr), slog.String("err", err.Error()))
+			continue
+		}
+		break
+	}
+
 	server := &http.Server{
 		Addr:    s.addr,
 		Handler: s.mux,
@@ -45,19 +61,29 @@ func (s *Server) Run(ctx context.Context) {
 		},
 	}
 
+	s.ready.Store(true)
+
 	go func() {
 		<-ctx.Done()
+		s.ready.Store(false)
 		if err := server.Close(); err != nil {
 			slog.Warn("failed to close server", slog.String("err", err.Error()))
 		}
 	}()
 
-	if err := server.ListenAndServe(); err != nil {
+	if err := server.Serve(ln); err != nil {
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
 		slog.Warn("failed to serve", slog.String("err", err.Error()))
 	}
+}
+
+func (s *Server) Ready() error {
+	if !s.ready.Load() {
+		return errNotReadyToAcceptConnections
+	}
+	return nil
 }
 
 func handleServiceInfo(w http.ResponseWriter, r *http.Request) {

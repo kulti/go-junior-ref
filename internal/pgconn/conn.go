@@ -6,19 +6,22 @@ import (
 	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Conn struct {
-	pool      *pgxpool.Pool
-	connCfg   *pgxpool.Config
-	connected atomic.Bool
+	pool          *pgxpool.Pool
+	connCfg       *pgxpool.Config
+	checkInterval time.Duration
+	connected     atomic.Bool
 }
 
 type Params struct {
 	ConnectionString string
+	ChecknInterval   time.Duration
 }
 
 func New(p Params) (*Conn, error) {
@@ -26,7 +29,7 @@ func New(p Params) (*Conn, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse pgx connection string: %w", err)
 	}
-	return &Conn{connCfg: connCfg}, nil
+	return &Conn{connCfg: connCfg, checkInterval: p.ChecknInterval}, nil
 }
 
 func (c *Conn) Run(ctx context.Context) {
@@ -51,7 +54,33 @@ func (c *Conn) Run(ctx context.Context) {
 	}()
 
 	c.connected.Store(true)
-	<-ctx.Done()
+
+	ticker := time.NewTicker(c.checkInterval)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if err := c.pool.Ping(ctx); err != nil {
+				if c.connected.Load() {
+					slog.Warn("connection lost", slog.String("err", err.Error()))
+					c.connected.Store(false)
+				}
+			} else {
+				if !c.connected.Load() {
+					slog.Info("connection restored")
+					c.connected.Store(true)
+				}
+			}
+		}
+	}
+}
+
+func (c *Conn) Ready() error {
+	if !c.connected.Load() {
+		return ErrConnectionNotReady
+	}
+	return nil
 }
 
 func (c *Conn) Exec(ctx context.Context, sql string, arguments ...any) (CommandTag, error) {

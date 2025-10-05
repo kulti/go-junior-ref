@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -19,10 +21,34 @@ type ServiceComponent interface {
 	// So Run implementation not needed to create an extra goroutine
 	// to work independently from other `Run`s.
 	Run(ctx context.Context)
+
+	// Ready returns nil if componenet is ready to work.
+	// Otherwise returns error with reason.
+	Ready() error
 }
 
 type Service struct {
-	Components []ServiceComponent
+	components map[string]ServiceComponent
+}
+
+func New() *Service {
+	return &Service{components: map[string]ServiceComponent{}}
+}
+
+func (s *Service) AddComponent(name string, c ServiceComponent) {
+	if _, ok := s.components[name]; ok {
+		panic("duplicate component name: " + name)
+	}
+	s.components[name] = c
+}
+
+func (s *Service) HandleReady(w http.ResponseWriter, r *http.Request) {
+	for n, c := range s.components {
+		if err := c.Ready(); err != nil {
+			http.Error(w, fmt.Sprintf("component %q is not ready: %s", n, err.Error()), http.StatusServiceUnavailable)
+			return
+		}
+	}
 }
 
 func Main(newService func() (*Service, error)) {
@@ -36,11 +62,16 @@ func Main(newService func() (*Service, error)) {
 	defer cancel()
 
 	var wg sync.WaitGroup
-	wg.Add(len(s.Components))
-	for _, c := range s.Components {
+	wg.Add(len(s.components))
+	for n, c := range s.components {
 		go func() {
-			defer wg.Done()
+			defer func() {
+				slog.Info("component stop", slog.String("name", n))
+				wg.Done()
+			}()
+			slog.Info("component runing", slog.String("name", n))
 			c.Run(ctx)
+			slog.Info("component run", slog.String("name", n))
 		}()
 	}
 
