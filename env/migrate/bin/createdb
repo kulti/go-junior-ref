@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Usage:
+#   createdb <dbname>
+
+set -xue
+
+DBNAME="$1"
+
+echo "SELECT 'CREATE DATABASE ${DBNAME}' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${DBNAME}')\gexec" | psql -h postgres -U postgres -v ON_ERROR_STOP=1

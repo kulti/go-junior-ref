@@ -1,7 +1,45 @@
 services:
+  postgres:
+    image: postgres:14.18
+    environment:
+      POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres || exit 1
+      interval: 1s
+      timeout: 10s
+      retries: 5
+
+  api_server_createdb:
+    image: ${IMAGE_TASK_LIST_MIGRATE}
+    command: createdb api_server_db
+    environment:
+      PGPASSWORD: password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api_server_migratedb:
+    image: ${IMAGE_TASK_LIST_MIGRATE}
+    environment:
+      MIGRATION_ID: "api_server_db"
+      DB_URL: "postgres://postgres:password@postgres:5432/api_server_db?sslmode=disable"
+    depends_on:
+      api_server_createdb:
+        condition: service_completed_successfully
+
   api_server:
     image: ${IMAGE_TASK_LIST}
+    environment:
+      API_SERVER_DB_URL: "postgres://postgres:password@postgres:5432/api_server_db?sslmode=disable"
     restart: on-failure
     command: /app/api-server
+    depends_on:
+      api_server_migratedb:
+        condition: service_completed_successfully
     ports:
       - "8090:8090"
+
+volumes:
+  postgres_data:

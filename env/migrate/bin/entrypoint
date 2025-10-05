@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -xue
+
+cd "$(dirname "$0")" || exit 1
+
+command="$1"
+
+case "${command}" in
+    createdb|migrate)
+        shift
+        "./${command}" "$@"
+        ;;
+    *)
+        echo "Unknown command: ${command}"
+        exit 1
+        ;;
+esac

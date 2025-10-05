@@ -10,6 +10,7 @@ function main() {
 
     export IMAGE_TAG=${IMAGE_TAG:-latest}
     export IMAGE_TASK_LIST=${IMAGE_TASK_LIST:-task-list:$IMAGE_TAG}
+    export IMAGE_TASK_LIST_MIGRATE=${IMAGE_TASK_LIST_MIGRATE:-task-list-migrate:$IMAGE_TAG}
 
     local cmd=$1
     shift || true
@@ -26,6 +27,9 @@ function main() {
         ;;
     clean)
         docker compose -p "${PROJECT_NAME}" down -v --remove-orphans
+        ;;
+    psql)
+        docker compose -p "${PROJECT_NAME}" exec -u postgres postgres psql "$@"
         ;;
     *)
         if [[ -n "${cmd}" ]]; then
