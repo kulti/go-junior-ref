@@ -1,0 +1,35 @@
+package apiserver
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/httpserver"
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/store"
+	"github.com/kulti/task_list_course/internal/pgconn"
+	"github.com/kulti/task_list_course/internal/service"
+)
+
+func New() (*service.Service, error) {
+	s := &service.Service{}
+
+	pgconn, err := pgconn.New(pgconn.Params{
+		ConnectionString: os.Getenv("API_SERVER_DB_URL"),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("new db conn: %w", err)
+	}
+	s.Components = append(s.Components, pgconn)
+
+	store := store.New(store.Params{PgConn: pgconn})
+	app := app.New(app.Params{Store: store})
+
+	server := httpserver.New(httpserver.Params{
+		App:           app,
+		ListenAddress: ":8090",
+	})
+	s.Components = append(s.Components, server)
+
+	return s, nil
+}
