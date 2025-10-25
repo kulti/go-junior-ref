@@ -17,6 +17,7 @@ type app interface {
 	CreateList(ctx context.Context, name string) (listID string, err error)
 	CreateItem(ctx context.Context, listID, name string) (itemID string, err error)
 	GetList(ctx context.Context, listID string) (list models.List, err error)
+	DoneItem(ctx context.Context, itemID string) (item models.Item, err error)
 }
 
 type Server struct {
@@ -39,6 +40,7 @@ func New(p Params) *Server {
 	s.mux.HandleFunc("POST /v1/lists", s.handeCreateList)
 	s.mux.HandleFunc("GET /v1/lists/{list_id}", s.handeGetList)
 	s.mux.HandleFunc("POST /v1/lists/{list_id}/items", s.handeCreateItem)
+	s.mux.HandleFunc("POST /v1/lists/{list_id}/items/{item_id}/done", s.handeDoneItem)
 	return s
 }
 

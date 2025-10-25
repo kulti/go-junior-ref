@@ -50,3 +50,25 @@ func (s *Server) handeCreateItem(w http.ResponseWriter, r *http.Request) {
 		// FIXME: how to handle this error?
 	}
 }
+
+func (s *Server) handeDoneItem(w http.ResponseWriter, r *http.Request) {
+	itemID := r.PathValue("item_id")
+
+	item, err := s.app.DoneItem(r.Context(), itemID)
+	if err != nil {
+		slog.Error("failed done item", slog.String("err", err.Error()))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := createItemResp{
+		Item: httpItem{
+			ID:   itemID,
+			Name: item.Name,
+			Done: item.Done,
+		},
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		// FIXME: how to handle this error?
+	}
+}

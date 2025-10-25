@@ -56,3 +56,14 @@ func (s *Store) GetList(ctx context.Context, listID string) (models.List, error)
 	list.Items = items
 	return list, nil
 }
+
+func (s *Store) DoneItem(ctx context.Context, itemID string) (models.Item, error) {
+	var item models.Item
+	row := s.conn.QueryRow(ctx,
+		`UPDATE items SET done = TRUE WHERE id = $1 RETURNING id, list_id, name, done`,
+		itemID)
+	if err := row.Scan(&item.ID, &item.ListID, &item.Name, &item.Done); err != nil {
+		return models.Item{}, fmt.Errorf("scan done item: %w", err)
+	}
+	return item, nil
+}
