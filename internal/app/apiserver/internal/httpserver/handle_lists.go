@@ -15,8 +15,9 @@ type getListResp struct {
 }
 
 type httpList struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID    string     `json:"id"`
+	Name  string     `json:"name"`
+	Items []httpItem `json:"items,omitempty"`
 }
 
 func (s *Server) handeCreateList(w http.ResponseWriter, r *http.Request) {
@@ -60,10 +61,21 @@ func (s *Server) handeGetList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+
+	items := make([]httpItem, len(list.Items))
+	for i, v := range list.Items {
+		items[i] = httpItem{
+			ID:   v.ID,
+			Name: v.Name,
+			Done: v.Done,
+		}
+	}
+
 	resp := getListResp{
 		List: httpList{
-			ID:   list.ID,
-			Name: list.Name,
+			ID:    list.ID,
+			Name:  list.Name,
+			Items: items,
 		},
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {

@@ -10,6 +10,7 @@ import (
 
 type store interface {
 	CreateList(ctx context.Context, list models.List) (err error)
+	CreateItem(ctx context.Context, item models.Item) (err error)
 	GetList(ctx context.Context, listID string) (list models.List, err error)
 }
 
@@ -31,6 +32,14 @@ func (a *App) CreateList(ctx context.Context, name string) (string, error) {
 		return "", fmt.Errorf("create list in db: %w", err)
 	}
 	return listID, nil
+}
+
+func (a *App) CreateItem(ctx context.Context, listID, name string) (string, error) {
+	itemID := uuid.NewString()
+	if err := a.store.CreateItem(ctx, models.Item{ID: itemID, ListID: listID, Name: name}); err != nil {
+		return "", fmt.Errorf("create list in db: %w", err)
+	}
+	return itemID, nil
 }
 
 func (a *App) GetList(ctx context.Context, listID string) (models.List, error) {

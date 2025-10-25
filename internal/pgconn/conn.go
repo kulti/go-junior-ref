@@ -98,3 +98,12 @@ func (c *Conn) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
 
 	return c.pool.QueryRow(ctx, sql, args...)
 }
+
+func (c *Conn) Query(ctx context.Context, sql string, args ...any) pgx.Rows {
+	if !c.connected.Load() {
+		return &Rows{err: ErrConnectionNotReady}
+	}
+
+	rows, _ := c.pool.Query(ctx, sql, args...)
+	return rows
+}

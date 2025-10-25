@@ -15,6 +15,7 @@ import (
 
 type app interface {
 	CreateList(ctx context.Context, name string) (listID string, err error)
+	CreateItem(ctx context.Context, listID, name string) (itemID string, err error)
 	GetList(ctx context.Context, listID string) (list models.List, err error)
 }
 
@@ -37,6 +38,7 @@ func New(p Params) *Server {
 	s.mux.HandleFunc("GET /debug/info", handleServiceInfo)
 	s.mux.HandleFunc("POST /v1/lists", s.handeCreateList)
 	s.mux.HandleFunc("GET /v1/lists/{list_id}", s.handeGetList)
+	s.mux.HandleFunc("POST /v1/lists/{list_id}/items", s.handeCreateItem)
 	return s
 }
 

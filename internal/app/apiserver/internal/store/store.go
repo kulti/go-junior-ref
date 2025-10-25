@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 	"github.com/kulti/task_list_course/internal/pgconn"
 )
@@ -27,11 +28,31 @@ func (s *Store) CreateList(ctx context.Context, list models.List) error {
 	return nil
 }
 
+func (s *Store) CreateItem(ctx context.Context, item models.Item) error {
+	if _, err := s.conn.Exec(ctx, `INSERT INTO items(id, list_id, name) VALUES($1, $2, $3)`,
+		item.ID, item.ListID, item.Name); err != nil {
+		return fmt.Errorf("insert item info: %w", err)
+	}
+	return nil
+}
+
 func (s *Store) GetList(ctx context.Context, listID string) (models.List, error) {
 	list := models.List{ID: listID}
 	row := s.conn.QueryRow(ctx, `SELECT name FROM lists WHERE id = $1`, listID)
 	if err := row.Scan(&list.Name); err != nil {
-		return models.List{}, fmt.Errorf("scan list row: %w", err)
+		return models.List{}, fmt.Errorf("scan list: %w", err)
 	}
+
+	rows := s.conn.Query(ctx, `SELECT id, name, done FROM items WHERE list_id = $1`, listID)
+	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (models.Item, error) {
+		var item models.Item
+		err := row.Scan(&item.ID, &item.Name, &item.Done)
+		return item, err
+	})
+	if err != nil {
+		return models.List{}, fmt.Errorf("scan list items: %w", err)
+	}
+
+	list.Items = items
 	return list, nil
 }
