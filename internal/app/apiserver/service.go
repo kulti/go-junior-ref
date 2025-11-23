@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/kulti/task_list_course/internal/amqp"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/httpserver"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/store"
@@ -24,8 +25,17 @@ func New() (*service.Service, error) {
 	}
 	s.AddComponent("pgconn", pgconn)
 
+	publisher := amqp.NewPublisher(amqp.PublisherParams{
+		DialAddress: os.Getenv("API_SERVER_AMQP_URL"),
+		DeclareExchange: amqp.Exchange{
+			Name: "item_events",
+			Type: amqp.ExchangeFanout,
+		},
+	})
+	s.AddComponent("publisher", publisher)
+
 	store := store.New(store.Params{PgConn: pgconn})
-	app := app.New(app.Params{Store: store})
+	app := app.New(app.Params{Store: store, Publisher: publisher})
 
 	server := httpserver.New(httpserver.Params{
 		App:           app,

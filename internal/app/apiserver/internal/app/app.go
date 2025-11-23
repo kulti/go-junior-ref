@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/kulti/task_list_course/internal/amqp"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 )
 
@@ -15,16 +17,22 @@ type store interface {
 	DoneItem(ctx context.Context, itemID string) (item models.Item, err error)
 }
 
+type publisher interface {
+	Publish(ctx context.Context, opts amqp.PublishOptions) error
+}
+
 type App struct {
-	store store
+	store     store
+	publisher publisher
 }
 
 type Params struct {
-	Store store
+	Store     store
+	Publisher publisher
 }
 
 func New(p Params) *App {
-	return &App{store: p.Store}
+	return &App{store: p.Store, publisher: p.Publisher}
 }
 
 func (a *App) CreateList(ctx context.Context, name string) (string, error) {
@@ -48,5 +56,36 @@ func (a *App) GetList(ctx context.Context, listID string) (models.List, error) {
 }
 
 func (a *App) DoneItem(ctx context.Context, itemID string) (models.Item, error) {
-	return a.store.DoneItem(ctx, itemID)
+	item, err := a.store.DoneItem(ctx, itemID)
+
+	if err == nil {
+		doneEvent := struct {
+			Type   string `json:"@type"`
+			ItemID string `json:"item_id"`
+		}{
+			Type:   "item_done",
+			ItemID: itemID,
+		}
+		listEvent := struct {
+			ListID string `json:"list_id"`
+			Event  any    `json:"event"`
+		}{
+			ListID: item.ListID,
+			Event:  doneEvent,
+		}
+		msgBody, err := json.Marshal(listEvent)
+		if err != nil {
+			return item, fmt.Errorf("marshal done item event: %w", err)
+		}
+		err = a.publisher.Publish(ctx, amqp.PublishOptions{
+			Exchange: "item_events",
+			Msg: amqp.Publishing{
+				Body: msgBody,
+			},
+		})
+		if err != nil {
+			return item, fmt.Errorf("publish done item event: %w", err)
+		}
+	}
+	return item, err
 }
