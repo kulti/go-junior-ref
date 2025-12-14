@@ -8,6 +8,7 @@ import (
 	"github.com/kulti/task_list_course/internal/amqp"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/httpserver"
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/notifier"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/store"
 	"github.com/kulti/task_list_course/internal/pgconn"
 	"github.com/kulti/task_list_course/internal/service"
@@ -34,6 +35,22 @@ func New() (*service.Service, error) {
 	})
 	s.AddComponent("publisher", publisher)
 
+	consumer := amqp.NewConsumer(amqp.ConsumerParams{
+		DialAddress: os.Getenv("API_SERVER_AMQP_URL"),
+		DeclareExchange: amqp.Exchange{
+			Name: "item_events",
+			Type: amqp.ExchangeFanout,
+		},
+		DeclareQueue: amqp.Queue{
+			Name:    "item_events.v1",
+			Durable: true,
+			BindTo: amqp.Bind{
+				ExchangeName: "item_events",
+			},
+		},
+	})
+	s.AddComponent("consumer", consumer)
+
 	store := store.New(store.Params{PgConn: pgconn})
 	app := app.New(app.Params{Store: store, Publisher: publisher})
 
@@ -43,6 +60,9 @@ func New() (*service.Service, error) {
 		ReadyHandler:  s.HandleReady,
 	})
 	s.AddComponent("httpserver", server)
+
+	notifier := notifier.New(notifier.Params{Store: store, Consumer: consumer})
+	s.AddComponent("notifier", notifier)
 
 	return s, nil
 }

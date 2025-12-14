@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -47,6 +48,7 @@ func (p *Publisher) Run(ctx context.Context) {
 
 		if err := p.connectAndWait(ctx); err != nil {
 			slog.Warn("AMQP publisher connection error", slog.String("err", err.Error()))
+			time.Sleep(time.Second)
 		}
 	}
 }
