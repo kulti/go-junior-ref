@@ -15,6 +15,7 @@ type store interface {
 	CreateItem(ctx context.Context, item models.Item) (err error)
 	GetList(ctx context.Context, listID string) (list models.List, err error)
 	DoneItem(ctx context.Context, itemID string) (item models.Item, err error)
+	Subscribe(ctx context.Context, listID, email string) error
 }
 
 type publisher interface {
@@ -88,4 +89,8 @@ func (a *App) DoneItem(ctx context.Context, itemID string) (models.Item, error) 
 		}
 	}
 	return item, err
+}
+
+func (a *App) Subscribe(ctx context.Context, listID, email string) error {
+	return a.store.Subscribe(ctx, listID, email)
 }

@@ -2,7 +2,10 @@ package amqp
 
 import "github.com/rabbitmq/amqp091-go"
 
-type Publishing = amqp091.Publishing
+type (
+	Publishing = amqp091.Publishing
+	Delivery   = amqp091.Delivery
+)
 
 type PublishOptions struct {
 	Exchange   string

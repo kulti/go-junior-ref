@@ -107,3 +107,11 @@ func (c *Conn) Query(ctx context.Context, sql string, args ...any) pgx.Rows {
 	rows, _ := c.pool.Query(ctx, sql, args...)
 	return rows
 }
+
+func (c *Conn) Begin(ctx context.Context) (pgx.Tx, error) {
+	if !c.connected.Load() {
+		return nil, ErrConnectionNotReady
+	}
+
+	return c.pool.Begin(ctx)
+}

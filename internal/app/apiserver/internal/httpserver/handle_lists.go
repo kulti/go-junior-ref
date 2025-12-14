@@ -82,3 +82,26 @@ func (s *Server) handeGetList(w http.ResponseWriter, r *http.Request) {
 		// FIXME: how to handle this error?
 	}
 }
+
+func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
+	listID := r.PathValue("list_id")
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		slog.Error("failed decode subscribe list request", slog.String("err", err.Error()))
+		http.Error(w, "invalid body json", http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" {
+		http.Error(w, "missed required field: email", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.app.Subscribe(r.Context(), listID, req.Email); err != nil {
+		slog.Error("failed subscribe to list", slog.String("err", err.Error()))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+}

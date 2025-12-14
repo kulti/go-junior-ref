@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -66,4 +67,69 @@ func (s *Store) DoneItem(ctx context.Context, itemID string) (models.Item, error
 		return models.Item{}, fmt.Errorf("scan done item: %w", err)
 	}
 	return item, nil
+}
+
+func (s *Store) Subscribe(ctx context.Context, listID, email string) error {
+	_, err := s.conn.Exec(ctx, `
+		WITH seq_num AS (
+			SELECT COALESCE(MAX(seq_num), 0) AS max
+			FROM list_events
+			WHERE list_id = $1
+		)
+		INSERT INTO list_subscribers(list_id, email, processed_count)
+		VALUES($1, $2, (SELECT max FROM seq_num))
+	`, listID, email)
+	if err != nil {
+		return fmt.Errorf("insert list subscriber: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) AddEvent(ctx context.Context, event models.ListEvent) error {
+	_, err := s.conn.Exec(ctx,
+		`INSERT INTO list_events(list_id, event_data) VALUES($1, $2)`,
+		event.ListID, event.Event)
+	if err != nil {
+		return fmt.Errorf("insert list event: %w", err)
+	}
+	return nil
+}
+
+func (s *Store) ProcessEvents(
+	ctx context.Context,
+	fn func(ctx context.Context, email string, event models.ListEvent) error,
+) error {
+	return pgx.BeginFunc(ctx, s.conn, func(tx pgx.Tx) error {
+		var email string
+		var event models.ListEvent
+		err := tx.QueryRow(ctx, `
+			SELECT ls.email, le.list_id, le.event_data
+			FROM list_subscribers AS ls
+			JOIN list_events as le
+				ON ls.list_id = le.list_id
+				AND ls.processed_count + 1 = le.seq_num
+			LIMIT 1
+			FOR UPDATE SKIP LOCKED
+		`).Scan(&email, &event.ListID, &event.Event)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return models.ErrNoEvents
+			}
+			return fmt.Errorf("scan event: %w", err)
+		}
+		fmt.Println("Processing event for ", email, " event: ", string(event.Event))
+		if err := fn(ctx, email, event); err != nil {
+			return fmt.Errorf("process event: %w", err)
+		}
+
+		_, err = tx.Exec(ctx, `
+			UPDATE list_subscribers
+			SET processed_count = processed_count + 1
+			WHERE list_id = $1 AND email = $2
+		`, event.ListID, email)
+		if err != nil {
+			return fmt.Errorf("update processed count: %w", err)
+		}
+		return nil
+	})
 }
