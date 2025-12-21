@@ -48,6 +48,7 @@ func (s *Store) GetList(ctx context.Context, listID string) (models.List, error)
 	items, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (models.Item, error) {
 		var item models.Item
 		err := row.Scan(&item.ID, &item.Name, &item.Done)
+		item.ListID = listID
 		return item, err
 	})
 	if err != nil {

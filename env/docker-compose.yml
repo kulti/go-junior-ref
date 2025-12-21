@@ -22,6 +22,8 @@ services:
       interval: 1s
       timeout: 10s
       retries: 5
+    ports:
+      - "5432:5432"
 
   api_server_createdb:
     image: ${IMAGE_TASK_LIST_MIGRATE}
