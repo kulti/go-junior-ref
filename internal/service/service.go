@@ -22,7 +22,7 @@ type ServiceComponent interface {
 	// to work independently from other `Run`s.
 	Run(ctx context.Context)
 
-	// Ready returns nil if componenet is ready to work.
+	// Ready returns nil if components is ready to work.
 	// Otherwise returns error with reason.
 	Ready() error
 }
@@ -42,7 +42,7 @@ func (s *Service) AddComponent(name string, c ServiceComponent) {
 	s.components[name] = c
 }
 
-func (s *Service) HandleReady(w http.ResponseWriter, r *http.Request) {
+func (s *Service) HandleReady(w http.ResponseWriter, _ *http.Request) {
 	for n, c := range s.components {
 		if err := c.Ready(); err != nil {
 			http.Error(w, fmt.Sprintf("component %q is not ready: %s", n, err.Error()), http.StatusServiceUnavailable)
@@ -69,7 +69,7 @@ func Main(newService func() (*Service, error)) {
 				slog.Info("component stop", slog.String("name", n))
 				wg.Done()
 			}()
-			slog.Info("component runing", slog.String("name", n))
+			slog.Info("component running", slog.String("name", n))
 			c.Run(ctx)
 			slog.Info("component run", slog.String("name", n))
 		}()

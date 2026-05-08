@@ -1,17 +1,18 @@
 //go:build integration
 
+//nolint:paralleltest //database tests use single database instance
 package store_test
 
 import (
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/go-faker/faker/v4"
+	"github.com/stretchr/testify/require"
+
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/store"
 	"github.com/kulti/task_list_course/internal/pgconn"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCreateList(t *testing.T) {
@@ -70,10 +71,7 @@ func setupStore(t *testing.T) *store.Store {
 	})
 	require.NoError(t, err)
 
-	var wg sync.WaitGroup
 	go func() {
-		wg.Add(1)
-		defer wg.Done()
 		conn.Run(t.Context())
 	}()
 

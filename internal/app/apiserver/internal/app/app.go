@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+
 	"github.com/kulti/task_list_course/internal/amqp"
 	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 )

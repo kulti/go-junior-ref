@@ -49,7 +49,7 @@ func (s *Server) handeCreateList(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		// FIXME: how to handle this error?
+		slog.Error("failed send response", slog.String("err", err.Error()))
 	}
 }
 
@@ -79,7 +79,7 @@ func (s *Server) handeGetList(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 	if err := json.NewEncoder(w).Encode(resp); err != nil {
-		// FIXME: how to handle this error?
+		slog.Error("failed send response", slog.String("err", err.Error()))
 	}
 }
 

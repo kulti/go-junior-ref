@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
-	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
+
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/app"
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 )
 
 type fixture struct {
@@ -18,6 +19,7 @@ type fixture struct {
 }
 
 func newFixture(t *testing.T) *fixture {
+	t.Helper()
 	mockCtl := gomock.NewController(t)
 	store := NewMockStore(mockCtl)
 	publisher := NewMockPublisher(mockCtl)
@@ -50,17 +52,20 @@ func (f *fixture) ExpectStoreCreateList(listName string) *string {
 }
 
 func (f *fixture) Subscribe(ctx context.Context, t *testing.T, listID, email string) {
+	t.Helper()
 	err := f.app.Subscribe(ctx, listID, email)
 	require.NoError(t, err)
 }
 
 func (f *fixture) GetList(ctx context.Context, t *testing.T, listID string) models.List {
+	t.Helper()
 	list, err := f.app.GetList(ctx, listID)
 	require.NoError(t, err)
 	return list
 }
 
 func (f *fixture) CreateList(ctx context.Context, t *testing.T, listName string) string {
+	t.Helper()
 	listID, err := f.app.CreateList(ctx, listName)
 	require.NoError(t, err)
 	return listID

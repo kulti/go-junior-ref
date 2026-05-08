@@ -14,6 +14,8 @@ import (
 )
 
 func TestList(t *testing.T) {
+	t.Parallel()
+
 	listID := createList(t, jsonShouldMarshal(t, map[string]any{
 		"name": "My List",
 	}))

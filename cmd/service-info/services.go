@@ -4,6 +4,7 @@ import (
 	"sort"
 )
 
+//nolint:gochecknoglobals // read-only variable
 var servicePorts = map[string]int{
 	"api-server": 8090,
 }

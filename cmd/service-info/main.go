@@ -45,6 +45,7 @@ func run() error {
 	}
 }
 
+//nolint:unparam // all run-command functions return error to be consistent
 func runVersions(ctx context.Context) error {
 	serviceNames := flag.String("s", "", "service name(s)")
 	flag.Parse()

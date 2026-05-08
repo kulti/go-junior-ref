@@ -105,10 +105,12 @@ func handleServiceInfo(w http.ResponseWriter, r *http.Request) {
 				vcsTime = setting.Value
 			}
 		}
-		fmt.Fprintln(w, "Go Version:", buildInfo.GoVersion, "Build Version:", vcsRevision[:8], "Build Time:", vcsTime)
+		fmt.Fprintln(w, "Go Version:", buildInfo.GoVersion, "Build Version:", vcsRevision[:8],
+			"Build Time:", vcsTime)
 	}
 }
 
+//nolint:gochecknoglobals // read-only variable
 var buildInfo *debug.BuildInfo = func() *debug.BuildInfo {
 	info, _ := debug.ReadBuildInfo()
 	return info

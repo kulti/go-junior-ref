@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	"github.com/go-faker/faker/v4"
-	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kulti/task_list_course/internal/app/apiserver/internal/models"
 )
 
 //go:generate mockgen -destination mock_test.go -source=app.go -package=app_test -mock_names store=MockStore,publisher=MockPublisher
