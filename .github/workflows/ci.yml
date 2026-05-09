@@ -43,3 +43,29 @@ jobs:
 
       - name: Build Docker image
         run: sh build.sh
+
+  integration_tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build Migrations
+        run: ./env/migrate/build.sh
+
+      - name: Build Services
+        run: ./build.sh
+
+      - name: Set up Test Environment
+        run: ./env/env.sh up
+
+      - name: Run Database Tests
+        run: go test -tags integration ./internal/app/apiserver/internal/store/store_test.go -v
+
+      - name: Run Integration Tests
+        run: go test -tags integration ./tests/... -v
